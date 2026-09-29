@@ -37,6 +37,10 @@ switch between Fast and Thinking, Ctrl+W to toggle web search, and Ctrl+U to
 attach a local file to the next prompt. Type the file path and press Enter;
 Esc cancels file selection. Arrow keys scroll the transcript, Ctrl+N starts
 a new conversation, and Ctrl+Q quits. It needs an interactive terminal.
+Assistant replies render Markdown headings, emphasis, lists, quotes, tables,
+links, and fenced code. Fenced Elixir, Erlang, and JSON code gets syntax
+colors; other languages remain readable as plain code. Link destinations
+appear after their labels so references can be opened outside the TUI.
 
 ## Command line
 
@@ -149,7 +153,7 @@ history.
 Run `mix quality` for compilation, formatting, dependency and compile-cycle
 checks, Credo, and tests. The tests cover encryption, OpenPGP wrapping,
 SSE framing, request payloads, attachment formatting, history, and Terra
-state.
+state and Markdown rendering.
 
 Copyright 2026 Cristiano Carvalho. Stealth Kitty uses the Apache-2.0
 license. See [LICENSE](LICENSE), [NOTICE](NOTICE), and

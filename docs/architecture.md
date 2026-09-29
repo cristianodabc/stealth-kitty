@@ -7,6 +7,9 @@
 `StealthKitty.TUI.State` hold reusable transformations. `StealthKitty.HTTP`
 owns Req calls, while `StealthKitty.PGP` owns OpenPGP encryption.
 `StealthKitty.TUI.Exchange` runs requests outside Terra's render loop.
+`StealthKitty.TUI.Markdown` converts parsed assistant replies into Terra
+lines. `StealthKitty.TUI.RichText` wraps styled spans by terminal cell width,
+and `StealthKitty.TUI.Syntax` maps lexer tokens to Terra styles.
 Model names and answer modes live in `StealthKitty.Models` and
 `StealthKitty.AnswerMode`. The terminal stores selected controls in
 `StealthKitty.TUI.State` and snapshots them for each request.
@@ -17,6 +20,8 @@ Model names and answer modes live in `StealthKitty.Models` and
   requests. A retry could generate a second answer or repeat a tool action.
 - Terra supplies the terminal loop, input widget, layout, and headless render
   support. The chat state and view are separate from network work.
+- EarmarkParser supplies Markdown structure. Makeup supplies token streams for
+  fenced Elixir, Erlang, and JSON code; unknown languages use plain text.
 - Erlang `:crypto` supplies Curve25519 ECDH, AES key wrapping primitives,
   AES-CFB, and AES-GCM. The code checks each response tag before delivering a
   chunk.
