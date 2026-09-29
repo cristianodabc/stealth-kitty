@@ -14,6 +14,8 @@ existing Proton bearer token. The terminal interface is built with
 [Elixir API](#elixir-api) · [Configuration][configuration] ·
 [Architecture][architecture]**
 
+<img width="800" src="https://github.com/user-attachments/assets/f3262bcf-e41d-494b-be9a-f3bee0d57771" />
+
 ## Quick start
 
 Use Elixir 1.18 or 1.19 with Erlang/OTP 28. CI runs Elixir 1.19 and OTP 28.
