@@ -12,23 +12,60 @@ defmodule StealthKitty.TUI.View do
   alias StealthKitty.TUI.Markdown
   alias Terra.Widget
 
+  @sidebar_width 24
+  @sidebar_min_width 96
+
   @doc "Renders the current chat state for Terra."
   @spec render(State.t()) :: Terra.View.t()
   def render(state) do
+    body =
+      cond do
+        state.help_visible ->
+          help_page(state)
+
+        narrow_sidebar?(state) ->
+          sidebar_page(state)
+
+        wide_sidebar?(state) ->
+          separator = List.duplicate(text("│", fg: :border), state.height - 2)
+
+          hstack([
+            sidebar(state),
+            vstack(separator),
+            text(" "),
+            vstack(content(state))
+          ])
+
+        true ->
+          vstack(content(state))
+      end
+
     box(
-      vstack(content(state)),
+      body,
       border: :rounded,
       padding: [left: 2, right: 2]
     )
   end
 
+  @doc "Returns the first visible transcript line and the last possible start."
+  @spec scroll_position(State.t()) :: {non_neg_integer(), non_neg_integer()}
+  def scroll_position(state) do
+    last = max(length(transcript_lines(state)) - transcript_height(state), 0)
+    first = if is_nil(state.scroll), do: last, else: min(state.scroll, last)
+    {first, last}
+  end
+
+  @doc "Returns the number of lines moved by a page navigation key."
+  @spec page_size(State.t()) :: pos_integer()
+  def page_size(state) do
+    max(transcript_height(state) - 1, 1)
+  end
+
   defp content(%{height: height} = state) when height < 16 do
     [
       header(state),
-      section(state),
-      transcript(state, max(height - 9, 2)),
+      transcript(state, transcript_height(state)),
       status(state),
-      composer_heading(state),
       composer(state),
       controls(state),
       footer(state)
@@ -41,7 +78,7 @@ defmodule StealthKitty.TUI.View do
       tagline(state),
       text(""),
       section(state),
-      transcript(state, max(state.height - 12, 2)),
+      transcript(state, transcript_height(state)),
       divider(state),
       status(state),
       composer_heading(state),
@@ -51,12 +88,116 @@ defmodule StealthKitty.TUI.View do
     ]
   end
 
+  defp transcript_height(%{height: height}) when height < 16 do
+    max(height - 8, 2)
+  end
+
+  defp transcript_height(state) do
+    max(state.height - 14, 2)
+  end
+
+  defp wide_sidebar?(state) do
+    state.sidebar_visible and state.width >= @sidebar_min_width
+  end
+
+  defp narrow_sidebar?(state) do
+    state.sidebar_visible and state.width < @sidebar_min_width
+  end
+
+  defp sidebar(state) do
+    rows =
+      [
+        text("CONVERSATIONS", fg: :accent, bold: true),
+        text(String.duplicate("─", 20), dim: true)
+      ] ++
+        sidebar_rows(state, 20, max(state.height - 8, 1)) ++
+        [
+          text(""),
+          text("^N new  ^B hide", dim: true),
+          text("Tab select", dim: true)
+        ]
+
+    vstack(rows, width: @sidebar_width, height: state.height - 2)
+  end
+
+  defp sidebar_page(state) do
+    width = content_width(state)
+
+    rows =
+      [
+        text("✦  STEALTH KITTY", fg: :accent, bold: true),
+        text(""),
+        text("CONVERSATIONS", fg: :accent, bold: true),
+        text(String.duplicate("─", width), dim: true)
+      ] ++
+        sidebar_rows(state, width, max(state.height - 8, 1)) ++
+        [
+          text(""),
+          text("↑↓ choose  ↵ open  Esc back", dim: true)
+        ]
+
+    vstack(rows, height: state.height - 2)
+  end
+
+  defp help_page(state) do
+    rows = [
+      text("✦  STEALTH KITTY", fg: :accent, bold: true),
+      text(""),
+      text("KEYBOARD SHORTCUTS", fg: :accent, bold: true),
+      text(String.duplicate("─", max(state.width - 6, 12)), dim: true),
+      text("↵ send     ^N new conversation"),
+      text("^R model   ^T Fast / Thinking"),
+      text("^W web     ^U attach file"),
+      text("^B chats   Tab focus sidebar"),
+      text("↑↓ lines    ^P/^F pages"),
+      text("^E latest   Esc back or quit"),
+      text("^Q quit     ^K close guide", fg: :accent)
+    ]
+
+    vstack(rows, height: state.height - 2)
+  end
+
+  defp sidebar_rows(state, width, slots) do
+    entries = State.sidebar_entries(state)
+    first = max(state.sidebar_selection - slots + 1, 0)
+
+    rows =
+      entries
+      |> Enum.with_index()
+      |> Enum.drop(first)
+      |> Enum.take(slots)
+      |> Enum.map(fn {entry, index} ->
+        sidebar_row(entry, index, state, width)
+      end)
+
+    rows ++ List.duplicate(text(""), slots - length(rows))
+  end
+
+  defp sidebar_row(entry, index, state, width) do
+    marker =
+      cond do
+        index == state.sidebar_selection and state.sidebar_focus -> "✦ "
+        entry.busy -> "◐ "
+        entry.active -> "● "
+        true -> "  "
+      end
+
+    title = fit(entry.title, max(width - 2, 1))
+
+    style =
+      if entry.active or index == state.sidebar_selection,
+        do: [fg: :accent],
+        else: []
+
+    text("#{marker}#{title}", style)
+  end
+
   defp header(%{width: width}) when width < 60 do
-    text("◆  STEALTH KITTY", fg: :accent, bold: true)
+    text("✦  STEALTH KITTY", fg: :accent, bold: true)
   end
 
   defp header(state) do
-    logo = "◆  STEALTH KITTY"
+    logo = "✦  STEALTH KITTY"
     mode = session_label(state)
     gap = max(content_width(state) - String.length(logo <> mode), 1)
 
@@ -136,9 +277,13 @@ defmodule StealthKitty.TUI.View do
   end
 
   defp transcript(state, height) do
-    lines = Enum.flat_map(state.messages, &message_lines(&1, state))
+    lines = transcript_lines(state)
     visible = visible_lines(lines, height, state.scroll)
     vstack(visible, height: height)
+  end
+
+  defp transcript_lines(state) do
+    Enum.flat_map(state.messages, &message_lines(&1, state))
   end
 
   defp empty_state(%{width: width} = state, height)
@@ -154,7 +299,9 @@ defmodule StealthKitty.TUI.View do
 
   defp empty_state(state, height) do
     hero = [
-      centered(state, "✦", fg: :accent, bold: true),
+      centered(state, "  ✧  ", fg: :accent),
+      centered(state, "✧ ✦ ✧", fg: :accent, bold: true),
+      centered(state, "  ✧  ", fg: :accent),
       text(""),
       centered(state, "A quiet space for your ideas.", bold: true),
       centered(state, "Ask anything. Your conversation starts here.", dim: true)
@@ -175,7 +322,12 @@ defmodule StealthKitty.TUI.View do
   end
 
   defp message_lines(%{role: :assistant} = message, state) do
-    label = text(role_label(:assistant), role_style(:assistant))
+    label =
+      if Map.get(message, :incomplete) do
+        text("✦ LUMO · INCOMPLETE", fg: :bright_red, bold: true)
+      else
+        text(role_label(:assistant), role_style(:assistant))
+      end
 
     body =
       message.content
@@ -221,7 +373,8 @@ defmodule StealthKitty.TUI.View do
   end
 
   defp visible_lines(lines, height, scroll) do
-    start = max(length(lines) - height - scroll, 0)
+    last = max(length(lines) - height, 0)
+    start = if is_nil(scroll), do: last, else: min(scroll, last)
     lines |> Enum.drop(start) |> Enum.take(height)
   end
 
@@ -247,28 +400,92 @@ defmodule StealthKitty.TUI.View do
     lines
   end
 
+  defp status(%{busy: true, scroll: scroll} = state) when not is_nil(scroll) do
+    {first, last} = scroll_position(state)
+    percent = if last == 0, do: 100, else: round(first * 100 / last)
+    busy_status(state, "  Lumo is thinking · History #{percent}%")
+  end
+
   defp status(%{busy: true} = state) do
+    busy_status(state, "  Lumo is thinking")
+  end
+
+  defp status(%{scroll: nil}) do
+    text("●  Ready for your next question", fg: :green)
+  end
+
+  defp status(state) do
+    {first, last} = scroll_position(state)
+
+    if last > 0 do
+      percent = round(first * 100 / last)
+
+      text(fit("↑  History #{percent}% · ↓ latest", content_width(state)),
+        fg: :accent
+      )
+    else
+      text("●  Ready for your next question", fg: :green)
+    end
+  end
+
+  defp busy_status(state, label) do
     frames = ["◐", "◓", "◑", "◒"]
 
     hstack([
       Widget.spinner(state.tick, frames: frames, style: [fg: :accent]),
-      text("  Lumo is thinking", dim: true)
+      text(fit(label, content_width(state) - 1), dim: true)
     ])
-  end
-
-  defp status(_state) do
-    text("●  Ready for your next question", fg: :green)
   end
 
   defp composer(state) do
+    width = max(content_width(state) - 6, 1)
+
+    {value, cursor, left?, right?} =
+      input_window(state.draft, state.cursor, width)
+
     hstack([
       text(" ❯  ", fg: :accent),
-      Widget.input(state.draft,
-        cursor: state.cursor,
+      text(if(left?, do: "‹", else: " "), dim: true),
+      Widget.input(value,
+        cursor: cursor,
         focused: not state.busy,
-        placeholder: placeholder(state)
-      )
+        placeholder: fit(placeholder(state), width)
+      ),
+      text(if(right?, do: "›", else: " "), dim: true)
     ])
+  end
+
+  defp input_window(value, cursor, width) do
+    graphemes = String.graphemes(value)
+    cursor = min(cursor, length(graphemes))
+    prefix = Enum.take(graphemes, cursor)
+    start = cursor - length(take_width(Enum.reverse(prefix), width - 1))
+    visible = graphemes |> Enum.drop(start) |> take_width(width - 1)
+
+    {Enum.join(visible), cursor - start, start > 0,
+     start + length(visible) < length(graphemes)}
+  end
+
+  defp take_width(graphemes, width) do
+    {taken, _used} =
+      Enum.reduce_while(graphemes, {[], 0}, fn grapheme, {acc, used} ->
+        size = Terra.Width.grapheme(grapheme)
+
+        if used + size <= width do
+          {:cont, {[grapheme | acc], used + size}}
+        else
+          {:halt, {acc, used}}
+        end
+      end)
+
+    Enum.reverse(taken)
+  end
+
+  defp fit(value, width) do
+    value
+    |> String.graphemes()
+    |> take_width(width)
+    |> Enum.join()
   end
 
   defp placeholder(%{input_mode: :attachment}) do
@@ -284,14 +501,19 @@ defmodule StealthKitty.TUI.View do
     mode = short_mode(state.client.reasoning_effort)
     web = short_web(state.tools)
 
-    chips = [
-      chip(" ◇ #{model} ", :selected),
-      chip(" ◷ #{mode} ", thinking?(state)),
-      chip(" ◎ #{web} ", web?(state)),
-      chip(" ⊕ ", attached?(state))
-    ]
+    first =
+      chip_row([
+        chip(" ◇ #{model} ^R ", :selected),
+        chip(" ◷ #{mode} ^T ", thinking?(state))
+      ])
 
-    chip_row(chips)
+    second =
+      chip_row([
+        chip(" ◎ Web #{web} ^W ", web?(state)),
+        chip(file_chip(state, 8), attached?(state))
+      ])
+
+    vstack([first, second])
   end
 
   defp controls(state) do
@@ -299,19 +521,24 @@ defmodule StealthKitty.TUI.View do
     mode = StealthKitty.AnswerMode.label(state.client.reasoning_effort)
     web = short_web(state.tools)
 
-    chips = [
-      chip(" ◇ #{model} ", :selected),
-      chip(" ◷ #{mode} ", thinking?(state)),
-      chip(" ◎ Web #{web} ", web?(state)),
-      chip(file_chip(state), attached?(state))
-    ]
+    first =
+      chip_row([
+        chip(" ◇ #{model} ^R ", :selected),
+        chip(" ◷ #{mode} ^T ", thinking?(state))
+      ])
 
-    chip_row(chips)
+    second =
+      chip_row([
+        chip(" ◎ Web #{web} ^W ", web?(state)),
+        chip(file_chip(state, 14), attached?(state))
+      ])
+
+    vstack([first, text(""), second])
   end
 
   defp chip_row(chips) do
     chips
-    |> Enum.intersperse(text(" "))
+    |> Enum.intersperse(text("  "))
     |> hstack()
   end
 
@@ -327,13 +554,13 @@ defmodule StealthKitty.TUI.View do
     text(label, fg: :bright_white, bg: 236)
   end
 
-  defp file_chip(%{attachment: nil}) do
-    " ⊕ File "
+  defp file_chip(%{attachment: nil}, _limit) do
+    " ⊕ File ^U "
   end
 
-  defp file_chip(state) do
-    filename = state.attachment |> Path.basename() |> String.slice(0, 14)
-    " ⊕ #{filename} "
+  defp file_chip(state, limit) do
+    filename = state.attachment |> Path.basename() |> fit(limit)
+    " ⊕ #{filename} ^U "
   end
 
   defp thinking?(state) do
@@ -380,22 +607,20 @@ defmodule StealthKitty.TUI.View do
     text("↵ attach file   Esc cancel", dim: true)
   end
 
-  defp footer(%{width: width}) when width < 45 do
-    text("^R mdl ^T mode ^W web ^U file ^Q", dim: true)
-  end
+  defp footer(state) do
+    width = content_width(state)
 
-  defp footer(%{width: width}) when width < 70 do
-    text("↵ send ^R model ^T mode ^W web ^U file ^Q", dim: true)
-  end
+    content =
+      cond do
+        width < 45 -> "↵ send  ^K keys  ^B chats"
+        true -> "↵ send  ^K keys  ^B chats  ^N new  ^Q quit"
+      end
 
-  defp footer(_state) do
-    text(
-      "↵ send  ^R model  ^T mode  ^W web  ^U file  ^N new  ^Q quit",
-      dim: true
-    )
+    text(fit(content, width), dim: true)
   end
 
   defp content_width(state) do
-    max(state.width - 6, 12)
+    sidebar_space = if wide_sidebar?(state), do: @sidebar_width + 2, else: 0
+    max(state.width - 6 - sidebar_space, 12)
   end
 end

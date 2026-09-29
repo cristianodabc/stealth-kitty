@@ -15,13 +15,38 @@ defmodule StealthKitty.TUI.State do
           tick: non_neg_integer(),
           width: pos_integer(),
           height: pos_integer(),
-          scroll: non_neg_integer(),
+          scroll: non_neg_integer() | nil,
           tools: [binary()],
           attachment: Path.t() | nil,
           input_mode: :prompt | :attachment,
           saved_draft: binary(),
-          saved_cursor: non_neg_integer()
+          saved_cursor: non_neg_integer(),
+          conversation_id: pos_integer(),
+          title: binary(),
+          next_id: pos_integer(),
+          conversations: %{pos_integer() => map()},
+          order: [pos_integer()],
+          sidebar_visible: boolean(),
+          sidebar_focus: boolean(),
+          sidebar_selection: non_neg_integer(),
+          help_visible: boolean()
         }
+
+  @session_fields [
+    :client,
+    :messages,
+    :draft,
+    :cursor,
+    :busy,
+    :scroll,
+    :tools,
+    :attachment,
+    :input_mode,
+    :saved_draft,
+    :saved_cursor,
+    :conversation_id,
+    :title
+  ]
 
   defstruct client: nil,
             messages: [],
@@ -31,12 +56,21 @@ defmodule StealthKitty.TUI.State do
             tick: 0,
             width: 80,
             height: 24,
-            scroll: 0,
+            scroll: nil,
             tools: [],
             attachment: nil,
             input_mode: :prompt,
             saved_draft: "",
-            saved_cursor: 0
+            saved_cursor: 0,
+            conversation_id: 1,
+            title: "New conversation",
+            next_id: 2,
+            conversations: %{},
+            order: [1],
+            sidebar_visible: false,
+            sidebar_focus: false,
+            sidebar_selection: 0,
+            help_visible: false
 
   @doc "Creates state with a client and an empty transcript."
   @spec new(StealthKitty.t()) :: t()
@@ -45,16 +79,136 @@ defmodule StealthKitty.TUI.State do
     %__MODULE__{client: client, tools: tools}
   end
 
-  @doc "Clears the transcript and client history."
-  @spec clear(t()) :: t()
-  def clear(state) do
+  @doc "Lists conversations in sidebar order, including the active one."
+  @spec sidebar_entries(t()) :: [map()]
+  def sidebar_entries(state) do
+    Enum.map(state.order, fn id ->
+      session = session(state, id)
+
+      %{
+        id: id,
+        title: session.title,
+        busy: session.busy,
+        active: id == state.conversation_id
+      }
+    end)
+  end
+
+  @doc "Starts a separate in-memory conversation with the current controls."
+  @spec new_conversation(t()) :: t()
+  def new_conversation(
+        %{
+          messages: [],
+          busy: false,
+          draft: "",
+          attachment: nil,
+          input_mode: :prompt
+        } = state
+      ) do
+    leave_sidebar(state)
+  end
+
+  def new_conversation(state) do
+    id = state.next_id
+    state = stash(state)
+    fresh = blank_session(StealthKitty.clear(state.client), id)
+
+    state
+    |> Map.merge(fresh)
+    |> Map.put(:next_id, id + 1)
+    |> Map.put(:order, [id | state.order])
+    |> Map.put(:sidebar_selection, 0)
+    |> leave_sidebar()
+  end
+
+  @doc "Switches to a saved conversation and restores its composer state."
+  @spec switch_conversation(t(), pos_integer()) :: t()
+  def switch_conversation(%{conversation_id: id} = state, id) do
+    leave_sidebar(state)
+  end
+
+  def switch_conversation(state, id) do
+    case Map.fetch(state.conversations, id) do
+      {:ok, saved} ->
+        state = stash(state)
+        state = %{state | conversations: Map.delete(state.conversations, id)}
+
+        state
+        |> Map.merge(saved)
+        |> Map.put(
+          :sidebar_selection,
+          Enum.find_index(state.order, &(&1 == id))
+        )
+        |> leave_sidebar()
+
+      :error ->
+        state
+    end
+  end
+
+  @doc "Sets whether the conversation sidebar is visible."
+  @spec show_sidebar(t(), boolean()) :: t()
+  def show_sidebar(state, visible) do
     %{
       state
-      | client: StealthKitty.clear(state.client),
-        messages: [],
-        scroll: 0,
-        attachment: nil
+      | sidebar_visible: visible,
+        sidebar_focus: visible and state.width < 96
     }
+  end
+
+  @doc "Toggles the sidebar or narrow-screen conversation list."
+  @spec toggle_sidebar(t()) :: t()
+  def toggle_sidebar(state) do
+    show_sidebar(state, not state.sidebar_visible)
+  end
+
+  @doc "Shows or hides the keyboard shortcut guide."
+  @spec toggle_help(t()) :: t()
+  def toggle_help(state) do
+    %{state | help_visible: not state.help_visible}
+  end
+
+  @doc "Closes the keyboard shortcut guide."
+  @spec close_help(t()) :: t()
+  def close_help(state) do
+    %{state | help_visible: false}
+  end
+
+  @doc "Moves keyboard focus between the composer and the wide sidebar."
+  @spec toggle_sidebar_focus(t()) :: t()
+  def toggle_sidebar_focus(%{sidebar_visible: true, width: width} = state)
+      when width >= 96 do
+    %{state | sidebar_focus: not state.sidebar_focus}
+  end
+
+  def toggle_sidebar_focus(state) do
+    state
+  end
+
+  @doc "Moves the highlighted conversation in the sidebar."
+  @spec move_sidebar_selection(t(), integer()) :: t()
+  def move_sidebar_selection(state, delta) do
+    last = max(length(state.order) - 1, 0)
+    selection = min(max(state.sidebar_selection + delta, 0), last)
+    %{state | sidebar_selection: selection}
+  end
+
+  @doc "Opens the highlighted conversation."
+  @spec select_sidebar_conversation(t()) :: t()
+  def select_sidebar_conversation(state) do
+    state.order
+    |> Enum.at(state.sidebar_selection)
+    |> then(&switch_conversation(state, &1))
+  end
+
+  @doc "Closes sidebar focus, or the narrow-screen conversation list."
+  @spec leave_sidebar(t()) :: t()
+  def leave_sidebar(%{width: width} = state) when width < 96 do
+    %{state | sidebar_visible: false, sidebar_focus: false}
+  end
+
+  def leave_sidebar(state) do
+    %{state | sidebar_focus: false}
   end
 
   @doc "Toggles the web search tool for future prompts."
@@ -119,19 +273,34 @@ defmodule StealthKitty.TUI.State do
   @doc "Updates the terminal dimensions."
   @spec resize(t(), pos_integer(), pos_integer()) :: t()
   def resize(state, width, height) do
-    %{state | width: width, height: height}
+    old_width = state.width
+    state = %{state | width: width, height: height}
+
+    if old_width >= 96 and width < 96 do
+      leave_sidebar(state)
+    else
+      state
+    end
   end
 
   @doc "Moves the transcript window toward older messages."
-  @spec scroll_up(t()) :: t()
-  def scroll_up(state) do
-    %{state | scroll: state.scroll + 3}
+  @spec scroll_up(t(), non_neg_integer(), pos_integer()) :: t()
+  def scroll_up(state, first_visible_line, amount \\ 3) do
+    %{state | scroll: max(first_visible_line - amount, 0)}
   end
 
   @doc "Moves the transcript window toward newer messages."
-  @spec scroll_down(t()) :: t()
-  def scroll_down(state) do
-    %{state | scroll: max(state.scroll - 3, 0)}
+  @spec scroll_down(t(), non_neg_integer(), non_neg_integer(), pos_integer()) ::
+          t()
+  def scroll_down(state, first_visible_line, last_start, amount \\ 3) do
+    next = first_visible_line + amount
+    %{state | scroll: if(next >= last_start, do: nil, else: next)}
+  end
+
+  @doc "Follows the latest response again."
+  @spec follow_latest(t()) :: t()
+  def follow_latest(state) do
+    %{state | scroll: nil}
   end
 
   @doc "Advances the activity indicator."
@@ -151,13 +320,17 @@ defmodule StealthKitty.TUI.State do
   def start_prompt(state, prompt) do
     message = %{role: :user, content: prompt}
 
+    title =
+      if state.messages == [], do: conversation_title(prompt), else: state.title
+
     %{
       state
       | messages: state.messages ++ [message],
         draft: "",
         cursor: 0,
         busy: true,
-        scroll: 0,
+        title: title,
+        scroll: nil,
         attachment: nil
     }
   end
@@ -168,6 +341,12 @@ defmodule StealthKitty.TUI.State do
     %{state | messages: append_to_answer(state.messages, chunk)}
   end
 
+  @doc "Routes a streamed chunk to the conversation that started the request."
+  @spec append_chunk(t(), pos_integer(), binary()) :: t()
+  def append_chunk(state, id, chunk) do
+    update_conversation(state, id, &append_chunk(&1, chunk))
+  end
+
   @doc "Completes an answer and stores its updated client history."
   @spec complete(t(), StealthKitty.response(), StealthKitty.t()) :: t()
   def complete(state, response, client) do
@@ -176,11 +355,84 @@ defmodule StealthKitty.TUI.State do
     %{state | client: client, messages: messages, busy: false}
   end
 
+  @doc "Routes a completed answer to its original conversation."
+  @spec complete(t(), pos_integer(), StealthKitty.response(), StealthKitty.t()) ::
+          t()
+  def complete(state, id, response, client) do
+    update_conversation(state, id, &complete(&1, response, client))
+  end
+
   @doc "Adds an error to the transcript and releases the input."
   @spec fail(t(), term()) :: t()
   def fail(state, reason) do
     message = %{role: :error, content: error_message(reason)}
-    %{state | messages: state.messages ++ [message], busy: false}
+    messages = mark_incomplete(state.messages)
+    %{state | messages: messages ++ [message], busy: false}
+  end
+
+  @doc "Routes a failed request to its original conversation."
+  @spec fail(t(), pos_integer(), term()) :: t()
+  def fail(state, id, reason) do
+    update_conversation(state, id, &fail(&1, reason))
+  end
+
+  defp session(%{conversation_id: id} = state, id) do
+    snapshot(state)
+  end
+
+  defp session(state, id) do
+    Map.fetch!(state.conversations, id)
+  end
+
+  defp blank_session(client, id) do
+    client
+    |> new()
+    |> Map.put(:conversation_id, id)
+    |> snapshot()
+  end
+
+  defp snapshot(state) do
+    Map.take(state, @session_fields)
+  end
+
+  defp stash(state) do
+    %{
+      state
+      | conversations:
+          Map.put(state.conversations, state.conversation_id, snapshot(state))
+    }
+  end
+
+  defp update_conversation(%{conversation_id: id} = state, id, fun) do
+    fun.(state)
+  end
+
+  defp update_conversation(state, id, fun) do
+    case Map.fetch(state.conversations, id) do
+      {:ok, saved} ->
+        updated = state |> Map.merge(saved) |> fun.() |> snapshot()
+        %{state | conversations: Map.put(state.conversations, id, updated)}
+
+      :error ->
+        state
+    end
+  end
+
+  defp conversation_title(prompt) do
+    prompt
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+    |> String.slice(0, 48)
+  end
+
+  defp mark_incomplete(messages) do
+    case Enum.reverse(messages) do
+      [%{role: :assistant} = answer | rest] ->
+        Enum.reverse([Map.put(answer, :incomplete, true) | rest])
+
+      _other ->
+        messages
+    end
   end
 
   defp append_to_answer(messages, chunk) do
