@@ -11,10 +11,13 @@ defmodule StealthKitty.TUI.Syntax do
   @doc "Highlights source for a registered Makeup language."
   @spec spans(binary(), binary()) :: [RichText.span()]
   def spans(source, language) do
-    language
-    |> String.downcase()
-    |> Registry.get_lexer_by_name()
-    |> lex(source)
+    language = String.downcase(language)
+
+    lexer =
+      Registry.get_lexer_by_name(language) ||
+        Registry.get_lexer_by_extension(language)
+
+    lex(lexer, source)
   end
 
   defp lex(nil, source) do

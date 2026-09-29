@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-09-29
+
+- Highlight fenced code in more than 200 languages, including Python, Ruby,
+  Rust, Go, JavaScript, TypeScript, Bash, SQL, and YAML.
+- Recognize common file extension labels such as `sh` and `py`.
+
 ## 0.2.0 - 2026-09-29
 
 - Render Markdown replies with highlighted Elixir, Erlang, and JSON code.

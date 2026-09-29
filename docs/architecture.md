@@ -114,7 +114,7 @@ implement login, refresh, or token storage.
 | Req | HTTP streaming with automatic request retries disabled |
 | Terra | Terminal loop, input, layout, and headless rendering |
 | EarmarkParser | Markdown document structure |
-| Makeup | Syntax tokens for Elixir, Erlang, and JSON code |
+| Makeup and MakeupSyntect | Syntax tokens for more than 200 fenced code languages |
 | Erlang `:crypto` | AES-GCM, Curve25519 ECDH, and key wrapping primitives |
 
 Retries are disabled because another generation request could repeat an
