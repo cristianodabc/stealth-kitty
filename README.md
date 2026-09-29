@@ -39,8 +39,10 @@ public key. [Proton limits guest access][guest-access].
 ## Terminal chat
 
 Stealth Kitty renders Markdown replies, including headings, emphasis, lists,
-quotes, tables, and links with visible destinations. Fenced Elixir, Erlang,
-and JSON code has syntax colors. Other code remains readable as plain text.
+quotes, tables, and links with visible destinations. Fenced code has syntax
+colors for more than 200 languages, including Python, Ruby, Rust, Go,
+JavaScript, TypeScript, Bash, SQL, Elixir, Erlang, and JSON. Unknown languages
+remain readable as plain text.
 
 | Key | Action |
 | --- | --- |

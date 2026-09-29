@@ -8,7 +8,7 @@ defmodule StealthKitty.MixProject do
   def project do
     [
       app: :stealth_kitty,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -39,6 +39,7 @@ defmodule StealthKitty.MixProject do
       {:makeup_elixir, "~> 1.0"},
       {:makeup_erlang, "~> 1.1"},
       {:makeup_json, "~> 1.0"},
+      {:makeup_syntect, "~> 0.1.4"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

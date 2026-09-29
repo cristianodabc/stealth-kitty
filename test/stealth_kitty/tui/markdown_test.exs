@@ -2,6 +2,7 @@ defmodule StealthKitty.TUI.MarkdownTest do
   use ExUnit.Case, async: true
 
   alias StealthKitty.TUI.Markdown
+  alias StealthKitty.TUI.Syntax
   alias Terra.View
 
   test "renders headings and inline emphasis with Terra styles" do
@@ -23,6 +24,7 @@ defmodule StealthKitty.TUI.MarkdownTest do
     assert text_of(known) =~ "def hello, do: :ok"
     assert text_of(unknown) =~ "plain code"
     assert styled?(placed, "d", :fg)
+    assert Syntax.spans("plain code", "mystery") == [{"plain code", []}]
   end
 
   test "renders an incomplete quoted string while code streams" do
@@ -70,6 +72,32 @@ defmodule StealthKitty.TUI.MarkdownTest do
       result = markdown |> Markdown.render(40) |> text_of()
 
       assert result =~ source
+    end
+  end
+
+  test "highlights common fenced languages" do
+    assert length(MakeupSyntect.Syntaxes.all()) > 200
+
+    examples = [
+      {"python", "def greet(name): return name"},
+      {"py", "def greet(name): return name"},
+      {"ruby", "def greet(name); name; end"},
+      {"rust", "fn greet() -> bool { true }"},
+      {"go", "func greet() bool { return true }"},
+      {"bash", "if true; then echo ok; fi"},
+      {"sh", "if true; then echo ok; fi"},
+      {"javascript", "const answer = 42;"},
+      {"typescript", "const answer: number = 42;"},
+      {"sql", "SELECT * FROM users;"},
+      {"yaml", "count: 2"}
+    ]
+
+    for {language, source} <- examples do
+      spans = Syntax.spans(source, language)
+      lines = Markdown.render("```#{language}\n#{source}\n```", 50)
+
+      assert Enum.any?(spans, fn {_text, style} -> style != [] end), language
+      assert text_of(lines) =~ source
     end
   end
 
