@@ -67,7 +67,7 @@ defmodule Mix.Tasks.StealthKitty.Tui do
           options,
           [:model, :reasoning_effort, :web_search]
         ),
-      theme: [accent: :bright_cyan, border: :bright_black]
+      theme: [accent: :bright_magenta, border: :bright_black]
     )
   end
 

@@ -269,16 +269,71 @@ defmodule StealthKitty.TUI.View do
 
   defp controls(%{width: width} = state) when width < 60 do
     model = short_model(state.client.model)
-    mode = StealthKitty.AnswerMode.label(state.client.reasoning_effort)
+    mode = short_mode(state.client.reasoning_effort)
     web = short_web(state.tools)
-    text("◇ #{model}  ·  ◷ #{mode}  ·  ◎ #{web}", dim: true)
+
+    chips = [
+      chip(" ◇ #{model} ", :selected),
+      chip(" ◷ #{mode} ", thinking?(state)),
+      chip(" ◎ #{web} ", web?(state)),
+      chip(" ⊕ ", attached?(state))
+    ]
+
+    chip_row(chips)
   end
 
   defp controls(state) do
     model = StealthKitty.Models.label(state.client.model)
     mode = StealthKitty.AnswerMode.label(state.client.reasoning_effort)
-    web = web_mode(state.tools)
-    text("◇ #{model}   ◷ #{mode}   ◎ #{web}   ⊕ File", dim: true)
+    web = short_web(state.tools)
+
+    chips = [
+      chip(" ◇ #{model} ", :selected),
+      chip(" ◷ #{mode} ", thinking?(state)),
+      chip(" ◎ Web #{web} ", web?(state)),
+      chip(file_chip(state), attached?(state))
+    ]
+
+    chip_row(chips)
+  end
+
+  defp chip_row(chips) do
+    chips
+    |> Enum.intersperse(text(" "))
+    |> hstack()
+  end
+
+  defp chip(label, :selected) do
+    text(label, fg: :accent, bg: 236, bold: true)
+  end
+
+  defp chip(label, true) do
+    text(label, fg: :bright_white, bg: 54, bold: true)
+  end
+
+  defp chip(label, false) do
+    text(label, fg: :bright_white, bg: 236)
+  end
+
+  defp file_chip(%{attachment: nil}) do
+    " ⊕ File "
+  end
+
+  defp file_chip(state) do
+    filename = state.attachment |> Path.basename() |> String.slice(0, 14)
+    " ⊕ #{filename} "
+  end
+
+  defp thinking?(state) do
+    state.client.reasoning_effort == "high"
+  end
+
+  defp web?(state) do
+    state.tools != []
+  end
+
+  defp attached?(state) do
+    state.attachment != nil
   end
 
   defp short_model("apertus-15") do
@@ -291,6 +346,14 @@ defmodule StealthKitty.TUI.View do
 
   defp short_model(_model) do
     "Lite"
+  end
+
+  defp short_mode("high") do
+    "Think"
+  end
+
+  defp short_mode(_effort) do
+    "Fast"
   end
 
   defp short_web([]) do

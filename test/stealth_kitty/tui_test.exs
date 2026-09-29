@@ -129,6 +129,24 @@ defmodule StealthKitty.TUITest do
     end
   end
 
+  test "keeps every active control visible in a narrow terminal" do
+    client =
+      StealthKitty.new(
+        model: "apertus-15",
+        reasoning_effort: "high",
+        web_search: true
+      )
+
+    state = State.resize(State.new(client), 40, 14)
+    frame = render(state)
+
+    assert frame =~ "Apertus"
+    assert frame =~ "Think"
+    assert frame =~ "On"
+    assert frame =~ "⊕"
+    assert frame =~ "^U file"
+  end
+
   defp render(state) do
     state
     |> StealthKitty.TUI.view()
