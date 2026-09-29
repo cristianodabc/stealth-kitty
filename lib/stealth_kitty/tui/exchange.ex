@@ -9,11 +9,13 @@ defmodule StealthKitty.TUI.Exchange do
   @doc "Starts one request using the client and tools in the current state."
   @spec start(pid(), State.t(), binary()) :: {:ok, pid()}
   def start(runtime, state, prompt) do
-    Task.start(fn -> run(runtime, state, prompt) end)
+    request = Map.take(state, [:conversation_id, :client, :tools, :attachment])
+    Task.start(fn -> run(runtime, request, prompt) end)
   end
 
   defp run(runtime, state, prompt) do
-    callback = fn _target, chunk -> send_event(runtime, {:chunk, chunk}) end
+    id = state.conversation_id
+    callback = fn _target, chunk -> send_event(runtime, {:chunk, id, chunk}) end
 
     options = [
       tools: state.tools,
@@ -22,9 +24,13 @@ defmodule StealthKitty.TUI.Exchange do
     ]
 
     result = send_prompt(state, prompt, options)
-    send_event(runtime, {:response, result})
+    send_event(runtime, {:response, id, result})
   rescue
-    _error -> send_event(runtime, {:response, {:error, :request_failed}})
+    _error ->
+      send_event(
+        runtime,
+        {:response, state.conversation_id, {:error, :request_failed}}
+      )
   end
 
   defp send_event(runtime, event) do

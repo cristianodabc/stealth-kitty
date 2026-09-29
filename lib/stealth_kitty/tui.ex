@@ -26,7 +26,12 @@ defmodule StealthKitty.TUI do
     {width, height} =
       Keyword.get_lazy(options, :size, &Terra.Terminal.size/0)
 
-    state = State.resize(State.new(client), width, height)
+    state =
+      client
+      |> State.new()
+      |> State.resize(width, height)
+      |> State.show_sidebar(width >= 96)
+
     {state, [{:tick, 120, :tick}]}
   end
 
@@ -41,12 +46,56 @@ defmodule StealthKitty.TUI do
     {:quit, state}
   end
 
-  def update({:ctrl, :n}, %{busy: true} = state) do
+  def update({:ctrl, :k}, state) do
+    State.toggle_help(state)
+  end
+
+  def update(:esc, %{help_visible: true} = state) do
+    State.close_help(state)
+  end
+
+  def update({:resize, width, height}, state) do
+    State.resize(state, width, height)
+  end
+
+  def update(:tick, state) do
+    {State.tick(state), [{:tick, 120, :tick}]}
+  end
+
+  def update({:chunk, id, chunk}, state) do
+    State.append_chunk(state, id, chunk)
+  end
+
+  def update({:response, id, {:ok, response, client}}, state) do
+    State.complete(state, id, response, client)
+  end
+
+  def update({:response, id, {:error, reason}}, state) do
+    State.fail(state, id, reason)
+  end
+
+  def update(_event, %{help_visible: true} = state) do
     state
   end
 
+  def update({:ctrl, :b}, state) do
+    State.toggle_sidebar(state)
+  end
+
   def update({:ctrl, :n}, state) do
-    State.clear(state)
+    State.new_conversation(state)
+  end
+
+  def update(:tab, state) do
+    State.toggle_sidebar_focus(state)
+  end
+
+  def update(:esc, %{sidebar_focus: true} = state) do
+    State.leave_sidebar(state)
+  end
+
+  def update(:enter, %{sidebar_focus: true} = state) do
+    State.select_sidebar_conversation(state)
   end
 
   def update({:ctrl, :w}, state) do
@@ -69,32 +118,47 @@ defmodule StealthKitty.TUI do
     State.begin_attachment(state)
   end
 
-  def update({:resize, width, height}, state) do
-    State.resize(state, width, height)
+  def update({:ctrl, :p}, %{sidebar_focus: true} = state) do
+    State.move_sidebar_selection(state, -View.page_size(state))
+  end
+
+  def update({:ctrl, :p}, state) do
+    {first, last} = View.scroll_position(state)
+
+    if last == 0,
+      do: state,
+      else: State.scroll_up(state, first, View.page_size(state))
+  end
+
+  def update({:ctrl, :f}, %{sidebar_focus: true} = state) do
+    State.move_sidebar_selection(state, View.page_size(state))
+  end
+
+  def update({:ctrl, :f}, state) do
+    {first, last} = View.scroll_position(state)
+    State.scroll_down(state, first, last, View.page_size(state))
+  end
+
+  def update({:ctrl, :e}, state) do
+    State.follow_latest(state)
+  end
+
+  def update(:up, %{sidebar_focus: true} = state) do
+    State.move_sidebar_selection(state, -1)
   end
 
   def update(:up, state) do
-    State.scroll_up(state)
+    {first, last} = View.scroll_position(state)
+    if last == 0, do: state, else: State.scroll_up(state, first)
+  end
+
+  def update(:down, %{sidebar_focus: true} = state) do
+    State.move_sidebar_selection(state, 1)
   end
 
   def update(:down, state) do
-    State.scroll_down(state)
-  end
-
-  def update(:tick, state) do
-    {State.tick(state), [{:tick, 120, :tick}]}
-  end
-
-  def update({:chunk, chunk}, state) do
-    State.append_chunk(state, chunk)
-  end
-
-  def update({:response, {:ok, response, client}}, state) do
-    State.complete(state, response, client)
-  end
-
-  def update({:response, {:error, reason}}, state) do
-    State.fail(state, reason)
+    {first, last} = View.scroll_position(state)
+    State.scroll_down(state, first, last)
   end
 
   def update(:esc, %{busy: true} = state) do

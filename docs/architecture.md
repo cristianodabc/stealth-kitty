@@ -41,7 +41,7 @@ flowchart LR
 | `Payload`, `Crypto` | Encrypt request turns |
 | `PGP`, `OpenPGP` | Wrap the request key |
 | `HTTP`, `Stream` | Post through Req and authenticate streamed events |
-| `TUI.State`, `TUI.Exchange` | Store controls and run requests |
+| `TUI.State`, `TUI.Exchange` | Store in-memory conversations and run tagged requests |
 | `TUI.View` | Render the conversation |
 | `TUI.Markdown`, `TUI.Syntax` | Format assistant text |
 | `TUI.RichText` | Wrap styled text by terminal cell width |
@@ -84,7 +84,9 @@ sequenceDiagram
 The TUI can show authenticated chunks before the final event. A failed or
 incomplete response does not enter the client's conversation history.
 `TUI.Exchange` returns chunks and the final result as Terra events;
-`TUI.State` applies them while `TUI.View` renders the current state.
+each event carries its conversation ID. `TUI.State` applies it to that
+conversation even if another is visible, while `TUI.View` renders the
+selected conversation. Conversations are discarded when the TUI exits.
 
 ## Encryption and trust boundaries
 

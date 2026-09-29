@@ -49,11 +49,21 @@ and JSON code has syntax colors. Other code remains readable as plain text.
 | Ctrl+T | Toggle Fast and Thinking |
 | Ctrl+W | Toggle web search |
 | Ctrl+U | Attach a local file to the next message |
-| Up / Down | Scroll the conversation |
+| Ctrl+B | Show or hide the conversation list |
+| Ctrl+K | Show or hide the keyboard shortcut guide |
+| Tab | Focus or leave the sidebar on wide terminals |
+| Up / Down | Scroll the chat, or choose a conversation in the list |
+| Ctrl+P / Ctrl+F | Move a page up or down in the chat or conversation list |
+| Ctrl+E | Return to the latest reply |
+| Enter | Send a message, or open the selected conversation |
 | Ctrl+N | Start a new conversation |
-| Esc / Ctrl+Q | Quit outside file selection |
+| Esc | Close the current list or guide; otherwise quit |
+| Ctrl+Q | Quit |
 
 After Ctrl+U, enter a file path and press Enter. Esc cancels file selection.
+On narrow terminals, Ctrl+B opens the conversation list as a separate view;
+Esc returns to the chat. Conversations and drafts stay in memory for the
+current run and are not saved to disk.
 Choose initial controls from the command line if you prefer:
 
 ```sh
