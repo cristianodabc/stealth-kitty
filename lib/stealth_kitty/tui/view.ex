@@ -9,6 +9,7 @@ defmodule StealthKitty.TUI.View do
   import Terra.View
 
   alias StealthKitty.TUI.State
+  alias StealthKitty.TUI.Markdown
   alias Terra.Widget
 
   @doc "Renders the current chat state for Terra."
@@ -171,6 +172,17 @@ defmodule StealthKitty.TUI.View do
     top = max(div(height - length(hero), 2), 0)
     blank = List.duplicate(text(""), top)
     vstack(blank ++ hero, height: height)
+  end
+
+  defp message_lines(%{role: :assistant} = message, state) do
+    label = text(role_label(:assistant), role_style(:assistant))
+
+    body =
+      message.content
+      |> Markdown.render(content_width(state) - 2)
+      |> Enum.map(&hstack([text("  "), &1]))
+
+    [label | body] ++ [text("")]
   end
 
   defp message_lines(message, state) do

@@ -34,6 +34,11 @@ defmodule StealthKitty.MixProject do
     [
       {:req, "~> 0.7.4"},
       {:terra, "~> 1.1"},
+      {:earmark_parser, "~> 1.4"},
+      {:makeup, "~> 1.2"},
+      {:makeup_elixir, "~> 1.0"},
+      {:makeup_erlang, "~> 1.1"},
+      {:makeup_json, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

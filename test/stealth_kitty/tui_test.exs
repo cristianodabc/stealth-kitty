@@ -147,6 +147,16 @@ defmodule StealthKitty.TUITest do
     assert frame =~ "^U file"
   end
 
+  test "renders Markdown answers inside the chat frame" do
+    state = State.new(StealthKitty.new())
+    message = %{role: :assistant, content: "**Hello** `world`"}
+    state = %{state | messages: [message]}
+    frame = render(state)
+
+    assert frame =~ "Hello world"
+    refute frame =~ "**Hello**"
+  end
+
   defp render(state) do
     state
     |> StealthKitty.TUI.view()
