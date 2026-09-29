@@ -10,11 +10,11 @@ An unofficial encrypted Elixir client and terminal chat for
 existing Proton bearer token. The terminal interface is built with
 [Terra][terra].
 
+<img width="800" src="https://github.com/user-attachments/assets/f3262bcf-e41d-494b-be9a-f3bee0d57771" />
+
 **[Quick start](#quick-start) · [Terminal chat](#terminal-chat) ·
 [Elixir API](#elixir-api) · [Configuration][configuration] ·
 [Architecture][architecture]**
-
-<img width="800" src="https://github.com/user-attachments/assets/f3262bcf-e41d-494b-be9a-f3bee0d57771" />
 
 ## Quick start
 
