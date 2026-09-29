@@ -1,5 +1,5 @@
-defmodule Lumex.MixProject do
-  @moduledoc "Mix configuration for the Lumex library and terminal tools."
+defmodule StealthKitty.MixProject do
+  @moduledoc "Mix configuration for Stealth Kitty."
 
   use Mix.Project
 
@@ -7,11 +7,12 @@ defmodule Lumex.MixProject do
   @spec project() :: keyword()
   def project do
     [
-      app: :lumex,
+      app: :stealth_kitty,
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       package: [licenses: ["Apache-2.0"]],
       description: "Encrypted Elixir client and terminal UI for Proton Lumo"
     ]
@@ -23,10 +24,30 @@ defmodule Lumex.MixProject do
     [extra_applications: [:crypto]]
   end
 
+  @doc "Runs the quality alias in the test environment."
+  @spec cli() :: keyword()
+  def cli do
+    [preferred_envs: [quality: :test]]
+  end
+
   defp deps do
     [
       {:req, "~> 0.7.4"},
-      {:terra, "~> 1.1"}
+      {:terra, "~> 1.1"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      quality: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "xref graph --format cycles --fail-above 0",
+        "deps.unlock --check-unused",
+        "credo --strict --min-priority high",
+        "test"
+      ]
     ]
   end
 end

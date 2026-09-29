@@ -1,4 +1,4 @@
 import Config
 
-config :lumex,
-  access_token: System.get_env("LUMEX_ACCESS_TOKEN")
+config :stealth_kitty,
+  access_token: System.get_env("STEALTH_KITTY_ACCESS_TOKEN")
