@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2026-09-29
+
+- Choose Lumo's built-in web, weather, stock, cryptocurrency, and Proton
+  information tools in the terminal chat with Ctrl+L.
+- Keep tool choices with each conversation and carry them into new chats.
+- Preserve the Ctrl+W web shortcut and show its state independently of other
+  selected tools.
+
 ## 0.3.0 - 2026-09-29
 
 - Choose Classic, Ocean, or Amber terminal themes at launch or from the chat.

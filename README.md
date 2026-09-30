@@ -52,6 +52,7 @@ remain readable as plain text.
 | Ctrl+R | Cycle models |
 | Ctrl+T | Toggle Fast and Thinking |
 | Ctrl+W | Toggle web search |
+| Ctrl+L | Choose built-in tools |
 | Ctrl+G | Cycle terminal themes |
 | Ctrl+U | Attach a local file to the next message |
 | Ctrl+B | Show or hide the conversation list |

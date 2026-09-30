@@ -57,9 +57,11 @@ The project does not implement account login or token refresh.
 
 The CLI accepts `proton_info`, `web_search`, `weather`, `stock`, and
 `cryptocurrency` in `--tools`. No tools are enabled by default.
-`--web-search` adds `web_search` to the selected list. The TUI exposes a
-web-search toggle with Ctrl+W. `--no-web-search` overrides an enabled
-default; an explicit `--tools web_search` still selects that tool.
+`--web-search` adds `web_search` to the selected list. In the TUI, Ctrl+L
+opens a picker for the same built-in tools, and Ctrl+W toggles web search.
+Use the arrow keys and Enter to toggle a tool, then Esc to close the picker.
+`--no-web-search` overrides an enabled default; an explicit
+`--tools web_search` still selects that tool.
 The TUI shows the current theme and cycles palettes with Ctrl+G.
 
 `--upload` accepts a file of at most 2 MiB. UTF-8 text is included as text;

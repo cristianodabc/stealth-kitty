@@ -6,6 +6,7 @@ defmodule StealthKitty.TUI.State do
 
   @type message :: %{role: atom(), content: binary()}
 
+  alias StealthKitty.Tools
   alias StealthKitty.TUI.Theme
 
   @type t :: %__MODULE__{
@@ -32,7 +33,9 @@ defmodule StealthKitty.TUI.State do
           sidebar_visible: boolean(),
           sidebar_focus: boolean(),
           sidebar_selection: non_neg_integer(),
-          help_visible: boolean()
+          help_visible: boolean(),
+          tools_visible: boolean(),
+          tool_selection: non_neg_integer()
         }
 
   @session_fields [
@@ -74,7 +77,9 @@ defmodule StealthKitty.TUI.State do
             sidebar_visible: false,
             sidebar_focus: false,
             sidebar_selection: 0,
-            help_visible: false
+            help_visible: false,
+            tools_visible: false,
+            tool_selection: 0
 
   @doc "Creates state with a client and an empty transcript."
   @spec new(StealthKitty.t(), binary()) :: t()
@@ -119,7 +124,7 @@ defmodule StealthKitty.TUI.State do
   def new_conversation(state) do
     id = state.next_id
     state = stash(state)
-    fresh = blank_session(StealthKitty.clear(state.client), id)
+    fresh = blank_session(StealthKitty.clear(state.client), id, state.tools)
 
     state
     |> Map.merge(fresh)
@@ -173,13 +178,40 @@ defmodule StealthKitty.TUI.State do
   @doc "Shows or hides the keyboard shortcut guide."
   @spec toggle_help(t()) :: t()
   def toggle_help(state) do
-    %{state | help_visible: not state.help_visible}
+    %{state | help_visible: not state.help_visible, tools_visible: false}
   end
 
   @doc "Closes the keyboard shortcut guide."
   @spec close_help(t()) :: t()
   def close_help(state) do
     %{state | help_visible: false}
+  end
+
+  @doc "Shows or hides the built-in tool picker."
+  @spec toggle_tools(t()) :: t()
+  def toggle_tools(state) do
+    %{state | tools_visible: not state.tools_visible, help_visible: false}
+  end
+
+  @doc "Closes the built-in tool picker."
+  @spec close_tools(t()) :: t()
+  def close_tools(state) do
+    %{state | tools_visible: false}
+  end
+
+  @doc "Moves the highlighted built-in tool."
+  @spec move_tool_selection(t(), integer()) :: t()
+  def move_tool_selection(state, delta) do
+    last = length(Tools.choices()) - 1
+    selection = min(max(state.tool_selection + delta, 0), last)
+    %{state | tool_selection: selection}
+  end
+
+  @doc "Toggles the highlighted built-in tool for future prompts."
+  @spec select_tool(t()) :: t()
+  def select_tool(state) do
+    {name, _label} = Enum.at(Tools.choices(), state.tool_selection)
+    toggle_tool(state, name)
   end
 
   @doc "Moves keyboard focus between the composer and the wide sidebar."
@@ -221,14 +253,31 @@ defmodule StealthKitty.TUI.State do
 
   @doc "Toggles the web search tool for future prompts."
   @spec toggle_web(t()) :: t()
-  def toggle_web(%{tools: []} = state) do
-    client = %{state.client | web_search: true}
-    %{state | client: client, tools: ["web_search"]}
+  def toggle_web(state) do
+    toggle_tool(state, "web_search")
   end
 
-  def toggle_web(state) do
-    client = %{state.client | web_search: false}
-    %{state | client: client, tools: []}
+  @doc "Toggles one supported tool while preserving the other selections."
+  @spec toggle_tool(t(), binary()) :: t()
+  def toggle_tool(state, name) do
+    if Tools.allowed?(name) do
+      selected = MapSet.new(state.tools)
+
+      selected =
+        if MapSet.member?(selected, name),
+          do: MapSet.delete(selected, name),
+          else: MapSet.put(selected, name)
+
+      tools =
+        Tools.choices()
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.filter(&MapSet.member?(selected, &1))
+
+      client = %{state.client | web_search: "web_search" in tools}
+      %{state | client: client, tools: tools}
+    else
+      state
+    end
   end
 
   @doc "Selects the next model for future prompts."
@@ -392,10 +441,11 @@ defmodule StealthKitty.TUI.State do
     Map.fetch!(state.conversations, id)
   end
 
-  defp blank_session(client, id) do
+  defp blank_session(client, id, tools) do
     client
     |> new()
     |> Map.put(:conversation_id, id)
+    |> Map.put(:tools, tools)
     |> snapshot()
   end
 
