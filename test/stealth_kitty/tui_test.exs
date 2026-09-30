@@ -126,14 +126,54 @@ defmodule StealthKitty.TUITest do
   test "keeps the composer inside the frame at common sizes" do
     client = StealthKitty.new()
 
-    for {width, height} <- [{80, 24}, {48, 16}, {40, 14}] do
+    for {width, height} <- [{80, 24}, {80, 18}, {60, 18}, {48, 16}, {40, 14}] do
       state = State.resize(State.new(client), width, height)
       lines = state |> render() |> String.split("\n")
 
       assert length(lines) == height
       assert Enum.all?(lines, &(String.length(&1) == width))
       assert Enum.any?(lines, &String.contains?(&1, "Ask Lumo"))
+      assert Enum.any?(lines, &String.match?(&1, ~r/THEME\s+\^G/))
+
+      for shortcut <- ["^R", "^T", "^W", "^U", "^G", "^K", "^B", "^N", "^Q"] do
+        assert Enum.any?(lines, &String.contains?(&1, shortcut))
+      end
     end
+  end
+
+  test "shows a centered cat on empty conversations" do
+    state = StealthKitty.new() |> State.new() |> State.resize(80, 24)
+    frame = render(state)
+
+    assert frame =~ "/\\_/\\"
+    assert frame =~ "( -.- )"
+    assert frame =~ "> ^ <"
+    assert frame =~ "A quiet space for your ideas."
+
+    compact =
+      StealthKitty.new() |> State.new() |> State.resize(40, 14) |> render()
+
+    assert compact =~ "/\\_/\\"
+    assert compact =~ "Start a conversation"
+  end
+
+  test "groups model, mode, and web with shortcuts beside their labels" do
+    for width <- [60, 80] do
+      state = StealthKitty.new() |> State.new() |> State.resize(width, 24)
+      lines = state |> render() |> String.split("\n")
+
+      settings = Enum.find(lines, &String.contains?(&1, "MODEL ^R"))
+      assert settings =~ "MODE ^T"
+      assert settings =~ "WEB ^W"
+      assert settings =~ ~r/Fast {3}WEB/
+
+      extras = Enum.find(lines, &String.contains?(&1, "FILE ^U"))
+      assert extras =~ "THEME ^G"
+    end
+
+    client = StealthKitty.new(reasoning_effort: "high", web_search: true)
+    state = State.resize(State.new(client), 60, 18)
+    assert render(state) =~ "MODE ^T Thinking   WEB ^W On"
   end
 
   test "shows active settings in a narrow terminal" do
@@ -150,7 +190,7 @@ defmodule StealthKitty.TUITest do
     assert frame =~ "Apertus"
     assert frame =~ "Think"
     assert frame =~ "On"
-    assert frame =~ "Web On"
+    assert frame =~ ~r/WEB\s+\^W\s+On/
     assert frame =~ "^B chats"
   end
 
@@ -273,11 +313,11 @@ defmodule StealthKitty.TUITest do
     state = State.append_chunk(state, String.duplicate("Line of answer\n", 20))
 
     state = StealthKitty.TUI.update(:up, state)
-    before = state |> render() |> String.split("\n") |> Enum.slice(2, 6)
+    before = state |> render() |> String.split("\n") |> Enum.slice(2, 4)
     assert state.scroll != nil
 
     state = State.append_chunk(state, "One more line\n")
-    after_lines = state |> render() |> String.split("\n") |> Enum.slice(2, 6)
+    after_lines = state |> render() |> String.split("\n") |> Enum.slice(2, 4)
     assert after_lines == before
   end
 

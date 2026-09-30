@@ -8,6 +8,8 @@ defmodule Mix.Tasks.StealthKitty.Tui do
 
   use Mix.Task
 
+  alias StealthKitty.TUI.Theme
+
   @shortdoc "Open the Stealth Kitty terminal chat"
 
   @type result ::
@@ -26,6 +28,7 @@ defmodule Mix.Tasks.StealthKitty.Tui do
     options = [
       strict: [
         model: :string,
+        theme: :string,
         thinking: :boolean,
         web_search: :boolean,
         help: :boolean
@@ -52,12 +55,15 @@ defmodule Mix.Tasks.StealthKitty.Tui do
 
   defp start(true, _options) do
     Mix.shell().info(
-      "mix stealth_kitty.tui [--model MODEL] [--thinking] [--web-search]"
+      "mix stealth_kitty.tui [--model MODEL] [--theme THEME] [--thinking] [--web-search]"
     )
+
+    Mix.shell().info("Themes: #{Enum.join(Theme.names(), ", ")}")
   end
 
   defp start(false, options) do
     validate(options)
+    theme = theme!(options)
     Mix.Task.run("app.start")
 
     Terra.run(
@@ -65,9 +71,9 @@ defmodule Mix.Tasks.StealthKitty.Tui do
       app:
         Keyword.take(
           options,
-          [:model, :reasoning_effort, :web_search]
+          [:model, :reasoning_effort, :web_search, :theme]
         ),
-      theme: [accent: :bright_magenta, border: :bright_black]
+      theme: theme
     )
   end
 
@@ -116,5 +122,19 @@ defmodule Mix.Tasks.StealthKitty.Tui do
 
   defp validate_value(false, message) do
     Mix.raise(message)
+  end
+
+  defp theme!(options) do
+    name = Keyword.get(options, :theme, Theme.default())
+
+    case Theme.fetch(name) do
+      {:ok, theme} ->
+        theme
+
+      :error ->
+        Mix.raise(
+          "Invalid theme: #{name}. Choose #{Enum.join(Theme.names(), ", ")}"
+        )
+    end
   end
 end

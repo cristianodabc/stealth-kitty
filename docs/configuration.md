@@ -46,6 +46,7 @@ The project does not implement account login or token refresh.
 | Option | CLI | TUI | Effect |
 | --- | :---: | :---: | --- |
 | `--model MODEL` | ✓ | ✓ | Select a supported model |
+| `--theme THEME` | | ✓ | Start with the `classic`, `ocean`, or `amber` terminal palette |
 | `--thinking` | ✓ | ✓ | Use Thinking mode |
 | `--no-thinking` | ✓ | ✓ | Use Fast mode |
 | `--web-search` | ✓ | ✓ | Enable web search |
@@ -59,6 +60,7 @@ The CLI accepts `proton_info`, `web_search`, `weather`, `stock`, and
 `--web-search` adds `web_search` to the selected list. The TUI exposes a
 web-search toggle with Ctrl+W. `--no-web-search` overrides an enabled
 default; an explicit `--tools web_search` still selects that tool.
+The TUI shows the current theme and cycles palettes with Ctrl+G.
 
 `--upload` accepts a file of at most 2 MiB. UTF-8 text is included as text;
 other files are base64 encoded before the prompt is encrypted. In the TUI,

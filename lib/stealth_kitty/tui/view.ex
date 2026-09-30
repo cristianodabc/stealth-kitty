@@ -10,6 +10,7 @@ defmodule StealthKitty.TUI.View do
 
   alias StealthKitty.TUI.State
   alias StealthKitty.TUI.Markdown
+  alias StealthKitty.TUI.Theme
   alias Terra.Widget
 
   @sidebar_width 24
@@ -40,11 +41,9 @@ defmodule StealthKitty.TUI.View do
           vstack(content(state))
       end
 
-    box(
-      body,
-      border: :rounded,
-      padding: [left: 2, right: 2]
-    )
+    body
+    |> box(border: :rounded, padding: [left: 2, right: 2])
+    |> Theme.apply(state.theme)
   end
 
   @doc "Returns the first visible transcript line and the last possible start."
@@ -61,7 +60,7 @@ defmodule StealthKitty.TUI.View do
     max(transcript_height(state) - 1, 1)
   end
 
-  defp content(%{height: height} = state) when height < 16 do
+  defp content(%{height: height} = state) when height < 18 do
     [
       header(state),
       transcript(state, transcript_height(state)),
@@ -88,12 +87,14 @@ defmodule StealthKitty.TUI.View do
     ]
   end
 
-  defp transcript_height(%{height: height}) when height < 16 do
-    max(height - 8, 2)
+  defp transcript_height(%{height: height} = state) when height < 18 do
+    fixed_rows = 6 + footer_rows(state)
+    max(height - 2 - fixed_rows, 2)
   end
 
   defp transcript_height(state) do
-    max(state.height - 14, 2)
+    fixed_rows = 11 + footer_rows(state)
+    max(state.height - 2 - fixed_rows, 2)
   end
 
   defp wide_sidebar?(state) do
@@ -148,7 +149,8 @@ defmodule StealthKitty.TUI.View do
       text("↵ send     ^N new conversation"),
       text("^R model   ^T Fast / Thinking"),
       text("^W web     ^U attach file"),
-      text("^B chats   Tab focus sidebar"),
+      text("^G theme   ^B chats"),
+      text("Tab focus sidebar"),
       text("↑↓ lines    ^P/^F pages"),
       text("^E latest   Esc back or quit"),
       text("^Q quit     ^K close guide", fg: :accent)
@@ -289,7 +291,8 @@ defmodule StealthKitty.TUI.View do
   defp empty_state(%{width: width} = state, height)
        when width < 60 or height < 8 do
     hero = [
-      centered(state, "✦", fg: :accent, bold: true),
+      centered(state, " /\\_/\\ ", fg: :accent),
+      centered(state, "( -.- )", fg: :accent),
       centered(state, "Start a conversation", bold: true),
       centered(state, "Ask Lumo anything.", dim: true)
     ]
@@ -299,9 +302,9 @@ defmodule StealthKitty.TUI.View do
 
   defp empty_state(state, height) do
     hero = [
-      centered(state, "  ✧  ", fg: :accent),
-      centered(state, "✧ ✦ ✧", fg: :accent, bold: true),
-      centered(state, "  ✧  ", fg: :accent),
+      centered(state, " /\\_/\\ ", fg: :accent),
+      centered(state, "( -.- )", fg: :accent),
+      centered(state, " > ^ < ", fg: :accent),
       text(""),
       centered(state, "A quiet space for your ideas.", bold: true),
       centered(state, "Ask anything. Your conversation starts here.", dim: true)
@@ -496,71 +499,114 @@ defmodule StealthKitty.TUI.View do
     "Ask Lumo anything…"
   end
 
-  defp controls(%{width: width} = state) when width < 60 do
-    model = short_model(state.client.model)
-    mode = short_mode(state.client.reasoning_effort)
-    web = short_web(state.tools)
-
-    first =
-      chip_row([
-        chip(" ◇ #{model} ^R ", :selected),
-        chip(" ◷ #{mode} ^T ", thinking?(state))
-      ])
-
-    second =
-      chip_row([
-        chip(" ◎ Web #{web} ^W ", web?(state)),
-        chip(file_chip(state, 8), attached?(state))
-      ])
-
-    vstack([first, second])
-  end
-
   defp controls(state) do
-    model = StealthKitty.Models.label(state.client.model)
-    mode = StealthKitty.AnswerMode.label(state.client.reasoning_effort)
-    web = short_web(state.tools)
+    three_columns? = content_width(state) >= 54
+    gap = if three_columns?, do: 3, else: 2
+    compact_width = div(content_width(state) - gap, 2)
+    model_width = if three_columns?, do: 22, else: compact_width
+    mode_width = if three_columns?, do: 16, else: compact_width
+    web_width = if three_columns?, do: 10, else: compact_width
+    file_width = if three_columns?, do: 22, else: compact_width
+    theme_width = if three_columns?, do: 18, else: compact_width
 
-    first =
-      chip_row([
-        chip(" ◇ #{model} ^R ", :selected),
-        chip(" ◷ #{mode} ^T ", thinking?(state))
+    model =
+      if model_width >= 22,
+        do: StealthKitty.Models.label(state.client.model),
+        else: short_model(state.client.model)
+
+    mode =
+      if mode_width >= 16,
+        do: StealthKitty.AnswerMode.label(state.client.reasoning_effort),
+        else: short_mode(state.client.reasoning_effort)
+
+    theme_name = String.capitalize(state.theme)
+    theme = if theme_width >= 18, do: "✦ #{theme_name}", else: theme_name
+
+    model_control = control_cell("MODEL", model, "^R", true, model_width)
+
+    mode_control =
+      control_cell("MODE", mode, "^T", thinking?(state), mode_width)
+
+    web_control =
+      control_cell(
+        "WEB",
+        short_web(state.tools),
+        "^W",
+        web?(state),
+        web_width
+      )
+
+    file_control =
+      control_cell(
+        "FILE",
+        file_value(state, file_width < 20),
+        "^U",
+        attached?(state),
+        file_width
+      )
+
+    theme_control = control_cell("THEME", theme, "^G", true, theme_width)
+
+    if three_columns? do
+      vstack([
+        control_row([model_control, mode_control, web_control], gap),
+        text(""),
+        control_row([file_control, theme_control], gap)
       ])
-
-    second =
-      chip_row([
-        chip(" ◎ Web #{web} ^W ", web?(state)),
-        chip(file_chip(state, 14), attached?(state))
-      ])
-
-    vstack([first, text(""), second])
+    else
+      first = control_row([model_control, mode_control], gap)
+      second = control_row([web_control, file_control], gap)
+      vstack([first, second, theme_control])
+    end
   end
 
-  defp chip_row(chips) do
-    chips
-    |> Enum.intersperse(text("  "))
+  defp control_row(cells, gap) do
+    cells
+    |> Enum.intersperse(text(String.duplicate(" ", gap)))
     |> hstack()
   end
 
-  defp chip(label, :selected) do
-    text(label, fg: :accent, bg: 236, bold: true)
+  defp control_cell(label, value, shortcut, active?, width) do
+    label_width =
+      min(String.length(label), max(width - String.length(shortcut) - 1, 0))
+
+    label = fit(label, label_width)
+    prefix = "#{label} #{shortcut}"
+    value_width = max(width - Terra.Width.string(prefix) - 1, 0)
+    value = fit(value, value_width)
+    value_gap = if value == "", do: 0, else: 1
+
+    color = if active?, do: :accent, else: :bright_white
+
+    hstack([
+      text(prefix, dim: true),
+      text(String.duplicate(" ", value_gap)),
+      text(value, fg: color, bold: active?)
+    ])
   end
 
-  defp chip(label, true) do
-    text(label, fg: :bright_white, bg: 54, bold: true)
+  defp footer_rows(%{input_mode: :attachment}) do
+    1
   end
 
-  defp chip(label, false) do
-    text(label, fg: :bright_white, bg: 236)
+  defp footer_rows(%{width: width}) when width < 60 do
+    2
   end
 
-  defp file_chip(%{attachment: nil}, _limit) do
-    " ⊕ File ^U "
+  defp footer_rows(_state) do
+    1
   end
 
-  defp file_chip(state, limit) do
-    filename = state.attachment |> Path.basename() |> fit(limit)
-    " ⊕ #{filename} ^U "
+  defp file_value(%{attachment: nil}, true) do
+    "Attach"
+  end
+
+  defp file_value(%{attachment: nil}, false) do
+    "Attach file"
+  end
+
+  defp file_value(state, _compact?) do
+    Path.basename(state.attachment)
   end
 
   defp thinking?(state) do
@@ -607,16 +653,20 @@ defmodule StealthKitty.TUI.View do
     text("↵ attach file   Esc cancel", dim: true)
   end
 
+  defp footer(%{width: width} = state) when width < 60 do
+    content_width = content_width(state)
+
+    vstack([
+      text(fit("↵ send  ^B chats  ^N new", content_width), dim: true),
+      text(fit("^K keys  ^Q quit", content_width), dim: true)
+    ])
+  end
+
   defp footer(state) do
-    width = content_width(state)
-
-    content =
-      cond do
-        width < 45 -> "↵ send  ^K keys  ^B chats"
-        true -> "↵ send  ^K keys  ^B chats  ^N new  ^Q quit"
-      end
-
-    text(fit(content, width), dim: true)
+    text(
+      fit("↵ send  ^K keys  ^B chats  ^N new  ^Q quit", content_width(state)),
+      dim: true
+    )
   end
 
   defp content_width(state) do

@@ -6,6 +6,8 @@ defmodule StealthKitty.TUI.State do
 
   @type message :: %{role: atom(), content: binary()}
 
+  alias StealthKitty.TUI.Theme
+
   @type t :: %__MODULE__{
           client: StealthKitty.t(),
           messages: [message()],
@@ -13,6 +15,7 @@ defmodule StealthKitty.TUI.State do
           cursor: non_neg_integer(),
           busy: boolean(),
           tick: non_neg_integer(),
+          theme: binary(),
           width: pos_integer(),
           height: pos_integer(),
           scroll: non_neg_integer() | nil,
@@ -54,6 +57,7 @@ defmodule StealthKitty.TUI.State do
             cursor: 0,
             busy: false,
             tick: 0,
+            theme: "classic",
             width: 80,
             height: 24,
             scroll: nil,
@@ -73,10 +77,14 @@ defmodule StealthKitty.TUI.State do
             help_visible: false
 
   @doc "Creates state with a client and an empty transcript."
-  @spec new(StealthKitty.t()) :: t()
-  def new(client) do
+  @spec new(StealthKitty.t(), binary()) :: t()
+  def new(client, theme \\ Theme.default()) do
     tools = StealthKitty.Tools.enable_web_search([], client.web_search)
-    %__MODULE__{client: client, tools: tools}
+    %__MODULE__{client: client, tools: tools, theme: String.downcase(theme)}
+  end
+
+  def cycle_theme(state) do
+    %{state | theme: Theme.next(state.theme)}
   end
 
   @doc "Lists conversations in sidebar order, including the active one."

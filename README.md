@@ -52,6 +52,7 @@ remain readable as plain text.
 | Ctrl+R | Cycle models |
 | Ctrl+T | Toggle Fast and Thinking |
 | Ctrl+W | Toggle web search |
+| Ctrl+G | Cycle terminal themes |
 | Ctrl+U | Attach a local file to the next message |
 | Ctrl+B | Show or hide the conversation list |
 | Ctrl+K | Show or hide the keyboard shortcut guide |
@@ -71,8 +72,11 @@ current run and are not saved to disk.
 Choose initial controls from the command line if you prefer:
 
 ```sh
-mix stealth_kitty.tui --model lumo-max --thinking --web-search
+mix stealth_kitty.tui --model lumo-max --theme ocean --thinking --web-search
 ```
+
+Choose `classic` (default), `ocean`, or `amber` with `--theme`, then cycle
+between them in the TUI with Ctrl+G.
 
 ## One-off prompts
 
