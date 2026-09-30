@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 - 2026-09-29
+
+- Choose Classic, Ocean, or Amber terminal themes at launch or from the chat.
+- Keep model, mode, web, file, and theme controls visible in a tighter layout,
+  including on narrow terminals.
+- Show an ASCII cat on the empty conversation screen.
+
 ## 0.2.1 - 2026-09-29
 
 - Highlight fenced code in more than 200 languages, including Python, Ruby,
