@@ -8,6 +8,7 @@ defmodule StealthKitty.TUI.View do
 
   import Terra.View
 
+  alias StealthKitty.Tools
   alias StealthKitty.TUI.State
   alias StealthKitty.TUI.Markdown
   alias StealthKitty.TUI.Theme
@@ -23,6 +24,9 @@ defmodule StealthKitty.TUI.View do
       cond do
         state.help_visible ->
           help_page(state)
+
+        state.tools_visible ->
+          tools_page(state)
 
         narrow_sidebar?(state) ->
           sidebar_page(state)
@@ -148,13 +152,43 @@ defmodule StealthKitty.TUI.View do
       text(String.duplicate("─", max(state.width - 6, 12)), dim: true),
       text("↵ send     ^N new conversation"),
       text("^R model   ^T Fast / Thinking"),
-      text("^W web     ^U attach file"),
+      text("^W web  ^L tools  ^U file"),
       text("^G theme   ^B chats"),
       text("Tab focus sidebar"),
       text("↑↓ lines    ^P/^F pages"),
       text("^E latest   Esc back or quit"),
       text("^Q quit     ^K close guide", fg: :accent)
     ]
+
+    vstack(rows, height: state.height - 2)
+  end
+
+  defp tools_page(state) do
+    width = content_width(state)
+
+    choices =
+      Tools.choices()
+      |> Enum.with_index()
+      |> Enum.map(fn {{name, label}, index} ->
+        marker = if index == state.tool_selection, do: "❯", else: " "
+        check = if name in state.tools, do: "[x]", else: "[ ]"
+        style = if index == state.tool_selection, do: [fg: :accent], else: []
+        text(fit("#{marker} #{check} #{label}", width), style)
+      end)
+
+    rows =
+      [
+        text("✦  STEALTH KITTY", fg: :accent, bold: true),
+        text(""),
+        text("BUILT-IN TOOLS", fg: :accent, bold: true),
+        text(String.duplicate("─", width), dim: true),
+        text("")
+      ] ++
+        choices ++
+        [
+          text(""),
+          text(fit("↑↓ choose  ↵ toggle  Esc close", width), dim: true)
+        ]
 
     vstack(rows, height: state.height - 2)
   end
@@ -223,12 +257,8 @@ defmodule StealthKitty.TUI.View do
     "ACCOUNT"
   end
 
-  defp web_mode([]) do
-    "WEB OFF"
-  end
-
-  defp web_mode(_tools) do
-    "WEB ON"
+  defp web_mode(tools) do
+    if "web_search" in tools, do: "WEB ON", else: "WEB OFF"
   end
 
   defp tagline(%{width: width} = state) when width < 50 do
@@ -503,11 +533,20 @@ defmodule StealthKitty.TUI.View do
     three_columns? = content_width(state) >= 54
     gap = if three_columns?, do: 3, else: 2
     compact_width = div(content_width(state) - gap, 2)
-    model_width = if three_columns?, do: 22, else: compact_width
-    mode_width = if three_columns?, do: 16, else: compact_width
-    web_width = if three_columns?, do: 10, else: compact_width
-    file_width = if three_columns?, do: 22, else: compact_width
-    theme_width = if three_columns?, do: 18, else: compact_width
+    roomy? = content_width(state) >= 74
+
+    {model_width, mode_width, web_width, file_width, theme_width, tools_width} =
+      cond do
+        roomy? ->
+          {22, 16, 10, 22, 18, 20}
+
+        three_columns? ->
+          {21, 16, 11, 20, 17, 11}
+
+        true ->
+          {compact_width, compact_width, compact_width, compact_width,
+           compact_width, compact_width}
+      end
 
     model =
       if model_width >= 22,
@@ -547,16 +586,26 @@ defmodule StealthKitty.TUI.View do
 
     theme_control = control_cell("THEME", theme, "^G", true, theme_width)
 
+    tools_control =
+      control_cell(
+        "TOOLS",
+        tools_value(state.tools, tools_width),
+        "^L",
+        state.tools != [],
+        tools_width
+      )
+
     if three_columns? do
       vstack([
         control_row([model_control, mode_control, web_control], gap),
         text(""),
-        control_row([file_control, theme_control], gap)
+        control_row([file_control, theme_control, tools_control], gap)
       ])
     else
       first = control_row([model_control, mode_control], gap)
-      second = control_row([web_control, file_control], gap)
-      vstack([first, second, theme_control])
+      second = control_row([web_control, tools_control], gap)
+      third = control_row([file_control, theme_control], gap)
+      vstack([first, second, third])
     end
   end
 
@@ -614,7 +663,7 @@ defmodule StealthKitty.TUI.View do
   end
 
   defp web?(state) do
-    state.tools != []
+    "web_search" in state.tools
   end
 
   defp attached?(state) do
@@ -641,12 +690,26 @@ defmodule StealthKitty.TUI.View do
     "Fast"
   end
 
-  defp short_web([]) do
-    "Off"
+  defp short_web(tools) do
+    if "web_search" in tools, do: "On", else: "Off"
   end
 
-  defp short_web(_tools) do
-    "On"
+  defp tools_value(tools, width) when width >= 17 do
+    case length(tools) do
+      0 -> "None"
+      count -> "#{count} active"
+    end
+  end
+
+  defp tools_value(tools, width) when width >= 14 do
+    case length(tools) do
+      0 -> "None"
+      count -> "#{count} on"
+    end
+  end
+
+  defp tools_value(tools, _width) do
+    Integer.to_string(length(tools))
   end
 
   defp footer(%{input_mode: :attachment}) do
@@ -658,13 +721,16 @@ defmodule StealthKitty.TUI.View do
 
     vstack([
       text(fit("↵ send  ^B chats  ^N new", content_width), dim: true),
-      text(fit("^K keys  ^Q quit", content_width), dim: true)
+      text(fit("^L tools  ^K keys  ^Q quit", content_width), dim: true)
     ])
   end
 
   defp footer(state) do
     text(
-      fit("↵ send  ^K keys  ^B chats  ^N new  ^Q quit", content_width(state)),
+      fit(
+        "↵ send  ^L tools  ^K keys  ^B chats  ^N new  ^Q quit",
+        content_width(state)
+      ),
       dim: true
     )
   end

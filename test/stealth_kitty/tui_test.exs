@@ -15,6 +15,74 @@ defmodule StealthKitty.TUITest do
 
     assert Terra.Test.render(machine) =~ "WEB ON"
     assert Terra.Test.state(machine).tools == ["web_search"]
+
+    assert Terra.Input.parse(<<12>>) == {[{:ctrl, :l}], ""}
+    Terra.Test.send_keys(machine, {:ctrl, :l})
+    assert Terra.Test.render(machine) =~ "BUILT-IN TOOLS"
+    assert Terra.Test.render(machine) =~ "[x] Web search"
+  end
+
+  test "selects built-in tools without losing the web shortcut" do
+    state = StealthKitty.new() |> State.new() |> State.resize(80, 24)
+    state = StealthKitty.TUI.update({:ctrl, :l}, state)
+
+    assert render(state) =~ "BUILT-IN TOOLS"
+    assert render(state) =~ "Weather"
+
+    state = StealthKitty.TUI.update(:down, state)
+    state = StealthKitty.TUI.update(:enter, state)
+    assert state.tools == ["weather"]
+    assert render(state) =~ "[x] Weather"
+
+    state = StealthKitty.TUI.update({:ctrl, :w}, state)
+    assert state.tools == ["web_search", "weather"]
+    assert state.client.web_search
+
+    state = StealthKitty.TUI.update({:ctrl, :w}, state)
+    assert state.tools == ["weather"]
+    refute state.client.web_search
+
+    state = StealthKitty.TUI.update(:esc, state)
+    refute state.tools_visible
+    assert render(state) =~ "TOOLS ^L 1 active"
+    assert render(state) =~ "WEB OFF"
+  end
+
+  test "new conversations inherit tools and saved conversations keep their choices" do
+    state = StealthKitty.new() |> State.new() |> State.toggle_tool("stock")
+    state = State.start_prompt(state, "First")
+    state = State.new_conversation(state)
+
+    assert state.tools == ["stock"]
+    state = State.toggle_tool(state, "cryptocurrency")
+    assert state.tools == ["stock", "cryptocurrency"]
+
+    state = State.switch_conversation(state, 1)
+    assert state.tools == ["stock"]
+  end
+
+  test "the picker fits a narrow terminal and preserves the prompt draft" do
+    state = StealthKitty.new() |> State.new() |> State.resize(40, 14)
+    state = State.edit(state, "Question in progress", 20)
+    state = StealthKitty.TUI.update({:ctrl, :l}, state)
+    lines = state |> render() |> String.split("\n")
+
+    assert length(lines) == 14
+    assert Enum.all?(lines, &(Terra.Width.string(&1) == 40))
+    assert Enum.any?(lines, &String.contains?(&1, "Proton information"))
+    assert Enum.any?(lines, &String.contains?(&1, "Esc close"))
+
+    state =
+      Enum.reduce(1..4, state, fn _, state ->
+        StealthKitty.TUI.update(:down, state)
+      end)
+
+    state = StealthKitty.TUI.update(:enter, state)
+    state = StealthKitty.TUI.update(:esc, state)
+
+    assert state.tools == ["proton_info"]
+    assert state.draft == "Question in progress"
+    assert render(state) =~ "TOOLS ^L 1 on"
   end
 
   test "keeps authenticated chunks visible and replaces them on completion" do
@@ -135,7 +203,18 @@ defmodule StealthKitty.TUITest do
       assert Enum.any?(lines, &String.contains?(&1, "Ask Lumo"))
       assert Enum.any?(lines, &String.match?(&1, ~r/THEME\s+\^G/))
 
-      for shortcut <- ["^R", "^T", "^W", "^U", "^G", "^K", "^B", "^N", "^Q"] do
+      for shortcut <- [
+            "^R",
+            "^T",
+            "^W",
+            "^L",
+            "^U",
+            "^G",
+            "^K",
+            "^B",
+            "^N",
+            "^Q"
+          ] do
         assert Enum.any?(lines, &String.contains?(&1, shortcut))
       end
     end
@@ -359,6 +438,8 @@ defmodule StealthKitty.TUITest do
 
     state = StealthKitty.TUI.update({:ctrl, :k}, state)
     assert render(state) =~ "KEYBOARD SHORTCUTS"
+    assert render(state) =~ "^L tools"
+    assert render(state) =~ "^Q quit"
     assert StealthKitty.TUI.update({:char, "a"}, state) == state
 
     state = StealthKitty.TUI.update(:esc, state)

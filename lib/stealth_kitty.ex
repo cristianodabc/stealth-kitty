@@ -199,8 +199,7 @@ defmodule StealthKitty do
   end
 
   defp valid_tools?(tools) when is_list(tools) do
-    allowed = ~w(proton_info web_search weather stock cryptocurrency)
-    Enum.all?(tools, &(&1 in allowed))
+    Enum.all?(tools, &Tools.allowed?/1)
   end
 
   defp valid_tools?(_tools) do

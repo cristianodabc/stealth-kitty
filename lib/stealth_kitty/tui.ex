@@ -50,12 +50,20 @@ defmodule StealthKitty.TUI do
     State.toggle_help(state)
   end
 
+  def update({:ctrl, :l}, state) do
+    State.toggle_tools(state)
+  end
+
   def update({:ctrl, :g}, state) do
     State.cycle_theme(state)
   end
 
   def update(:esc, %{help_visible: true} = state) do
     State.close_help(state)
+  end
+
+  def update(:esc, %{tools_visible: true} = state) do
+    State.close_tools(state)
   end
 
   def update({:resize, width, height}, state) do
@@ -79,6 +87,26 @@ defmodule StealthKitty.TUI do
   end
 
   def update(_event, %{help_visible: true} = state) do
+    state
+  end
+
+  def update(:up, %{tools_visible: true} = state) do
+    State.move_tool_selection(state, -1)
+  end
+
+  def update(:down, %{tools_visible: true} = state) do
+    State.move_tool_selection(state, 1)
+  end
+
+  def update(:enter, %{tools_visible: true} = state) do
+    State.select_tool(state)
+  end
+
+  def update({:ctrl, :w}, %{tools_visible: true} = state) do
+    State.toggle_web(state)
+  end
+
+  def update(_event, %{tools_visible: true} = state) do
     state
   end
 
