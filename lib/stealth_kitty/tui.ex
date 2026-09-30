@@ -6,7 +6,7 @@ defmodule StealthKitty.TUI do
 
   use Terra
 
-  alias StealthKitty.TUI.{Exchange, State, View}
+  alias StealthKitty.TUI.{Exchange, State, Theme, View}
   alias Terra.Widget
 
   @type update_result ::
@@ -28,7 +28,7 @@ defmodule StealthKitty.TUI do
 
     state =
       client
-      |> State.new()
+      |> State.new(Keyword.get(options, :theme, Theme.default()))
       |> State.resize(width, height)
       |> State.show_sidebar(width >= 96)
 
@@ -48,6 +48,10 @@ defmodule StealthKitty.TUI do
 
   def update({:ctrl, :k}, state) do
     State.toggle_help(state)
+  end
+
+  def update({:ctrl, :g}, state) do
+    State.cycle_theme(state)
   end
 
   def update(:esc, %{help_visible: true} = state) do
